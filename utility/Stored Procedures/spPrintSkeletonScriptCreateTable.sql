@@ -1,4 +1,8 @@
-﻿CREATE PROCEDURE [utility].[spPrintSkeletonScriptCreateTable]
+﻿--
+--	Do you like this project? Do you find it helpful? Pay it forward by hiring me as a consultant!
+--  https://jason-iverson.com
+--
+CREATE PROCEDURE [utility].[spPrintSkeletonScriptCreateTable]
     @schemaName nvarchar(50),
     @tableName nvarchar(50),
 	@includeRowIndex bit = 0

@@ -1,4 +1,8 @@
-﻿CREATE PROCEDURE [utility].[spPrintSkeletonScriptCRUDProcedures]
+﻿--
+--	Do you like this project? Do you find it helpful? Pay it forward by hiring me as a consultant!
+--  https://jason-iverson.com
+--
+CREATE PROCEDURE [utility].[spPrintSkeletonScriptCRUDProcedures]
     @schemaName nvarchar(50),
     @nameSingular nvarchar(50),
     @namePlural nvarchar(50)
