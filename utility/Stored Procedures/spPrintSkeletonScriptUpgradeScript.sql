@@ -53,6 +53,7 @@ BEGIN
     DECLARE @when DATETIME;
     SELECT @when = ExecutionTimestamp FROM maintenance.[SchemaUpdates] WHERE [Identity] = @updateStamp
     PRINT ''The update that corresponds to '' + Convert(varchar(40), @updateStamp) + '' has previously been applied on '' + Convert(varchar(40), @when, 109)
-END'
+END
+GO'
 END
 GO
