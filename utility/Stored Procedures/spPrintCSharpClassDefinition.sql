@@ -15,12 +15,13 @@ SET NOCOUNT ON;
 --	@tableName nvarchar(max) = 'Prospects'
 
 
+
 DECLARE @VariableMapping TABLE (
-	SqlDataType nvarchar(100),
-	CSharpDataType nvarchar(100),
-	CSharpDataTypeNullable nvarchar(100),
-	CSharpDefaultValue nvarchar(50),
-	CSharpNullableDefaultValue nvarchar(50) DEFAULT 'null'
+    SqlDataType nvarchar(100),
+    CSharpDataType nvarchar(100),
+    CSharpDataTypeNullable nvarchar(100),
+    CSharpDefaultValue nvarchar(50),
+    CSharpNullableDefaultValue nvarchar(50) DEFAULT 'null'
 );
 
 
@@ -50,47 +51,49 @@ SELECT 'varchar', 'String', 'String', 'String.Empty', 'String.Empty'
 
 
 DECLARE @ClassFields TABLE (
-	[FieldName] nvarchar(100) NOT NULL PRIMARY KEY,
-	[CSharpDataType] nvarchar(100) NOT NULL,
-	[CSharpDefaultValue] nvarchar(100) NOT NULL
+    [FieldName] nvarchar(100) NOT NULL PRIMARY KEY,
+    [CSharpDataType] nvarchar(100) NOT NULL,
+    [CSharpDefaultValue] nvarchar(100) NOT NULL
 );
 
 INSERT INTO @ClassFields (FieldName, CSharpDataType, CSharpDefaultValue)
 SELECT
-	COLUMN_NAME AS FieldName,
-	(SELECT Case When IS_NULLABLE = 'YES' Then CSharpDataTypeNullable Else CSharpDataType End FROM @VariableMapping WHERE SqlDataType = C.DATA_TYPE) AS CSharpDataType,
-	(SELECT Case When IS_NULLABLE = 'YES' Then CSharpNullableDefaultValue Else  CSharpDefaultValue  End FROM @VariableMapping WHERE SqlDataType = C.DATA_TYPE) AS CSharpDefaultValue
+    COLUMN_NAME AS FieldName,
+    (SELECT Case When IS_NULLABLE = 'YES' Then CSharpDataTypeNullable Else CSharpDataType End FROM @VariableMapping WHERE SqlDataType = C.DATA_TYPE) AS CSharpDataType,
+    (SELECT Case When IS_NULLABLE = 'YES' Then CSharpNullableDefaultValue Else  CSharpDefaultValue  End FROM @VariableMapping WHERE SqlDataType = C.DATA_TYPE) AS CSharpDefaultValue
 FROM
-	INFORMATION_SCHEMA.COLUMNS AS C
+    INFORMATION_SCHEMA.COLUMNS AS C
 WHERE
-	C.[TABLE_NAME] = @tableName
+    C.[TABLE_NAME] = @tableName
 AND
-	C.[TABLE_SCHEMA] = @schemaName
+    C.[TABLE_SCHEMA] = @schemaName
+AND
+	COLUMN_NAME NOT IN ('Identity', 'RowIndex')
 ORDER BY
-	C.ORDINAL_POSITION;
+    C.ORDINAL_POSITION;
 
 
 SELECT
-	*
+    *
 INTO 
-	#Fields
+    #Fields
 FROM 
-	@ClassFields
+    @ClassFields
 
 
 SELECT
-	*
+    *
 INTO 
-	#Properties
+    #Properties
 FROM 
-	@ClassFields
+    @ClassFields
 
 DECLARE
-	@FieldName nvarchar(100),
-	@DataType nvarchar(100),
-	@DefaultValue nvarchar(100);
+    @FieldName nvarchar(100),
+    @DataType nvarchar(100),
+    @DefaultValue nvarchar(100);
 
-PRINT 'public class ' + @TableName + ' {'
+PRINT 'public class ' + @TableName + ' : JM0ney.Framework.Data.ObjectBase<' + @TableName + '> {'
 
 
 PRINT '
@@ -100,47 +103,75 @@ PRINT '
 
 WHILE (SELECT COUNT(*) FROM #Fields) > 0
 BEGIN
-	SELECT TOP 1 
-		@FieldName = FieldName,
-		@DataType = CSharpDataType,
-		@DefaultValue = CSharpDefaultValue
-	FROM
-		#Fields
+    SELECT TOP 1 
+        @FieldName = FieldName,
+        @DataType = CSharpDataType,
+        @DefaultValue = CSharpDefaultValue
+    FROM
+        #Fields
 
-	PRINT '    private ' + @DataType + ' _' + @FieldName + ' = ' + @DefaultValue + ';';
+    PRINT '    private ' + @DataType + ' _' + @FieldName + ' = ' + @DefaultValue + ';';
 
-	DELETE FROM #Fields WHERE [FieldName] = @FieldName;
+    DELETE FROM #Fields WHERE [FieldName] = @FieldName;
 END
 
-PRINT '
+PRINT '    private readonly JM0ney.Framework.Data.Metadata.MetadataInfo _Metadata;
+
     #endregion Fields
 
-	#region Constructor(s)
+    #region Constructor(s)
 
-	public ' + @TableName + '( ) {
-	}
-	
-	#endregion Constructor(s)
-	
-	#region Properties '
+    public ' + @TableName + '( ) {
+        this._Metadata = new JM0ney.Framework.Data.Metadata.MetadataInfo( "name_singular", "name_plural", "schema_name", "object_name_singular", "object_name_plural" );
+    }
+
+    public ' + @TableName + '( JM0ney.Framework.Data.IDataAdapter adapter ) 
+        : this( ) {
+        this.Adapter = adapter;
+    }
+    
+    #endregion Constructor(s)
+    
+    #region Overrides
+
+    protected override ' + @TableName + ' AsDataObject {
+        get { return this; }
+    }
+
+    public override Dictionary<String, Object> GetValues( ) {
+        Dictionary<String, Object> dict = base.GetValues( );
+        return dict;
+    }
+
+    public override void Load( String fieldNamePrefix, Boolean deepLoad, Int32 tableIndex, Int32 rowIndex, DataSet dataSet ) {
+        base.Load( fieldNamePrefix, deepLoad, tableIndex, rowIndex, dataSet );
+    }
+    
+    public override JM0ney.Framework.Data.Metadata.MetadataInfo Metadata {
+        get { return this._Metadata; }
+    }
+        
+    #endregion Overrides
+
+    #region Properties '
 
 WHILE (SELECT COUNT(*) FROM #Properties) > 0
 BEGIN
-	SELECT TOP 1 
-		@FieldName = FieldName,
-		@DataType = CSharpDataType,
-		@DefaultValue = CSharpDefaultValue
-	FROM
-		#Properties
+    SELECT TOP 1 
+        @FieldName = FieldName,
+        @DataType = CSharpDataType,
+        @DefaultValue = CSharpDefaultValue
+    FROM
+        #Properties
 
-	PRINT '
-	public ' + @DataType + ' ' + @FieldName + ' {
-		get { return this._' + @FieldName + '; }
-		set { this._' + @FieldName + ' = value; }
-	}'
-		
+    PRINT '
+    public ' + @DataType + ' ' + @FieldName + ' {
+        get { return this._' + @FieldName + '; }
+        set { this._' + @FieldName + ' = value; }
+    }'
+        
 
-	DELETE FROM #Properties WHERE [FieldName] = @FieldName;
+    DELETE FROM #Properties WHERE [FieldName] = @FieldName;
 END
 
 PRINT '
