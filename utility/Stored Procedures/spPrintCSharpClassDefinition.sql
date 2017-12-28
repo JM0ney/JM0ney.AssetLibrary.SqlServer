@@ -53,14 +53,16 @@ SELECT 'varchar', 'String', 'String', 'String.Empty', 'String.Empty'
 DECLARE @ClassFields TABLE (
     [FieldName] nvarchar(100) NOT NULL PRIMARY KEY,
     [CSharpDataType] nvarchar(100) NOT NULL,
-    [CSharpDefaultValue] nvarchar(100) NOT NULL
+    [CSharpDefaultValue] nvarchar(100) NOT NULL,
+	[IsNullable] bit NOT NULL
 );
 
-INSERT INTO @ClassFields (FieldName, CSharpDataType, CSharpDefaultValue)
+INSERT INTO @ClassFields (FieldName, CSharpDataType, CSharpDefaultValue, IsNullable)
 SELECT
     COLUMN_NAME AS FieldName,
     (SELECT Case When IS_NULLABLE = 'YES' Then CSharpDataTypeNullable Else CSharpDataType End FROM @VariableMapping WHERE SqlDataType = C.DATA_TYPE) AS CSharpDataType,
-    (SELECT Case When IS_NULLABLE = 'YES' Then CSharpNullableDefaultValue Else  CSharpDefaultValue  End FROM @VariableMapping WHERE SqlDataType = C.DATA_TYPE) AS CSharpDefaultValue
+    (SELECT Case When IS_NULLABLE = 'YES' Then CSharpNullableDefaultValue Else  CSharpDefaultValue  End FROM @VariableMapping WHERE SqlDataType = C.DATA_TYPE) AS CSharpDefaultValue,
+	(SELECT Case When IS_NULLABLE = 'YES' Then 1 Else 0 End FROM @VariableMapping WHERE SqlDataType = C.DATA_TYPE) AS IsNullable
 FROM
     INFORMATION_SCHEMA.COLUMNS AS C
 WHERE
@@ -72,13 +74,12 @@ AND
 ORDER BY
     C.ORDINAL_POSITION;
 
-
 SELECT
     *
 INTO 
     #Fields
 FROM 
-    @ClassFields
+    @ClassFields;
 
 
 SELECT
@@ -86,14 +87,18 @@ SELECT
 INTO 
     #Properties
 FROM 
-    @ClassFields
+    @ClassFields;
 
 DECLARE
     @FieldName nvarchar(100),
     @DataType nvarchar(100),
-    @DefaultValue nvarchar(100);
+    @DefaultValue nvarchar(100),
+	@IsNullable bit;
 
-PRINT 'public class ' + @TableName + ' : JM0ney.Framework.Data.ObjectBase<' + @TableName + '> {'
+PRINT '
+using JM0ney.Framework.Data;
+
+public class ' + @TableName + ' : JM0ney.Framework.Data.ObjectBase<' + @TableName + '> {'
 
 
 PRINT '
@@ -101,14 +106,49 @@ PRINT '
 
 '
 
+DECLARE
+	@LoadInitialize nvarchar(max),
+	@LoadOverride nvarchar(max),
+	@GetValuesInitialize nvarchar(max),
+	@GetValuesOverride nvarchar(max);
+
+SELECT
+	@LoadInitialize = '',
+	@LoadOverride = '',
+	@GetValuesInitialize = '',
+	@GetValuesOverride = '';
+
 WHILE (SELECT COUNT(*) FROM #Fields) > 0
 BEGIN
     SELECT TOP 1 
         @FieldName = FieldName,
         @DataType = CSharpDataType,
-        @DefaultValue = CSharpDefaultValue
+        @DefaultValue = CSharpDefaultValue,
+		@IsNullable = IsNullable
     FROM
         #Fields
+
+	SELECT @LoadOverride += '
+		if (! dataSet.IsDBNull( tableIndex, rowIndex, "' + @FieldName + '", fieldNamePrefix ) )
+			this._' + @FieldName + ' = dataSet.GetValue<' + REPLACE(@DataType, '?', '') + '>( tableIndex, rowIndex, "' + @FieldName + '", fieldNamePrefix );';
+
+	IF @IsNullable = 1
+	BEGIN
+		SET @LoadInitialize += '
+		this._' + @FieldName + ' = ' + @DefaultValue +';
+	'
+		SET @GetValuesInitialize = '
+		dict["' + @FieldName + '"] = null;';
+
+		SET @GetValuesOverride += '
+		if ( this.' + @FieldName + '.HasValue )
+			dict[ "' + @FieldName + '" ] = this.' + @FieldName + '.Value;';
+	END
+	ELSE
+	BEGIN
+		SET @GetValuesOverride += '
+		dict[ "' + @FieldName + '" ] = this.' + @FieldName + ';	';
+	END
 
     PRINT '    private ' + @DataType + ' _' + @FieldName + ' = ' + @DefaultValue + ';';
 
@@ -122,7 +162,7 @@ PRINT '    private readonly JM0ney.Framework.Data.Metadata.MetadataInfo _Metadat
     #region Constructor(s)
 
     public ' + @TableName + '( ) {
-        this._Metadata = new JM0ney.Framework.Data.Metadata.MetadataInfo( "name_singular", "name_plural", "schema_name", "object_name_singular", "object_name_plural" );
+        this._Metadata = new JM0ney.Framework.Data.Metadata.MetadataInfo( "' + @TableName + '", "name_plural", "' + @SchemaName + '", "'+ @TableName + '", "object_name_plural" );
     }
 
     public ' + @TableName + '( JM0ney.Framework.Data.IDataAdapter adapter ) 
@@ -139,13 +179,17 @@ PRINT '    private readonly JM0ney.Framework.Data.Metadata.MetadataInfo _Metadat
     }
 
     public override Dictionary<String, Object> GetValues( ) {
-        Dictionary<String, Object> dict = base.GetValues( );
-        return dict;
+        Dictionary<String, Object> dict = base.GetValues( );'
+		+ @GetValuesInitialize + @GetValuesOverride +
+    '    
+		return dict;
     }
 
-    public override void Load( String fieldNamePrefix, Boolean deepLoad, Int32 tableIndex, Int32 rowIndex, DataSet dataSet ) {
-        base.Load( fieldNamePrefix, deepLoad, tableIndex, rowIndex, dataSet );
-    }
+    public override void Load( String fieldNamePrefix, Boolean deepLoad, Int32 tableIndex, Int32 rowIndex, System.Data.DataSet dataSet ) { '
+		+ @LoadInitialize +
+    '    base.Load( fieldNamePrefix, deepLoad, tableIndex, rowIndex, dataSet );' + @LoadOverride + 
+	'
+	}
     
     public override JM0ney.Framework.Data.Metadata.MetadataInfo Metadata {
         get { return this._Metadata; }
