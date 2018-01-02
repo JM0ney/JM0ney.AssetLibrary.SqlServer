@@ -79,15 +79,17 @@ SELECT
 INTO 
     #Fields
 FROM 
-    @ClassFields;
+    @ClassFields
 
+	
+-- select * from #fields;
 
 SELECT
     *
 INTO 
     #Properties
 FROM 
-    @ClassFields;
+    @ClassFields
 
 DECLARE
     @FieldName nvarchar(100),
@@ -97,6 +99,7 @@ DECLARE
 
 PRINT '
 using JM0ney.Framework.Data;
+
 
 public class ' + @TableName + ' : JM0ney.Framework.Data.ObjectBase<' + @TableName + '> {'
 
@@ -130,7 +133,7 @@ BEGIN
 
 	SELECT @LoadOverride += '
 		if (! dataSet.IsDBNull( tableIndex, rowIndex, "' + @FieldName + '", fieldNamePrefix ) )
-			this._' + @FieldName + ' = dataSet.GetValue<' + REPLACE(@DataType, '?', '') + '>( tableIndex, rowIndex, "' + @FieldName + '", fieldNamePrefix );';
+			this.' + @FieldName + ' = dataSet.GetValue<' + REPLACE(@DataType, '?', '') + '>( tableIndex, rowIndex, "' + @FieldName + '", fieldNamePrefix );';
 
 	IF @IsNullable = 1
 	BEGIN
@@ -170,7 +173,9 @@ PRINT '    private readonly JM0ney.Framework.Data.Metadata.MetadataInfo _Metadat
         this.Adapter = adapter;
     }
     
-    #endregion Constructor(s)
+    #endregion Constructor(s)'
+
+PRINT'
     
     #region Overrides
 
@@ -183,7 +188,9 @@ PRINT '    private readonly JM0ney.Framework.Data.Metadata.MetadataInfo _Metadat
 		+ @GetValuesInitialize + @GetValuesOverride +
     '    
 		return dict;
-    }
+    }'
+
+PRINT'
 
     public override void Load( String fieldNamePrefix, Boolean deepLoad, Int32 tableIndex, Int32 rowIndex, System.Data.DataSet dataSet ) { '
 		+ @LoadInitialize +
