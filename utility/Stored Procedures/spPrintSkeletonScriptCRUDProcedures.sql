@@ -11,134 +11,117 @@ BEGIN
 
     SET NOCOUNT ON;
 
-        /*
-        DECLARE
-            @schemaName nvarchar(20),
-            @nameSingular nvarchar(50),
-            @namePlural nvarchar(50),
-            @procLoad varchar(max),
-            @procSave varchar(max),
-            @procDelete varchar(max),
-            @procList varchar(max);
+    DECLARE
+		@procFileNames varchar(max),
+        @procLoad varchar(max),
+        @procSave varchar(max),
+        @procDelete varchar(max),
+        @procList varchar(max),
+        @procListBy varchar(max);
 
-        SELECT
-            @nameSingular = 'Unit',
-            @namePlural = 'Units',
-            @schemaName = 'dbo';
-        */
-        DECLARE
-			@procFileNames varchar(max),
-            @procLoad varchar(max),
-            @procSave varchar(max),
-            @procDelete varchar(max),
-            @procList varchar(max),
-            @procListBy varchar(max);
+    DECLARE @ExcludedFields TABLE (
+        FieldName nvarchar(40) NOT NULL
+    );
 
-        DECLARE @ExcludedFields TABLE (
-            FieldName nvarchar(40) NOT NULL
-        );
+    DECLARE @IncludedFields TABLE (
+        FieldName nvarchar(40) NOT NULL,
+        ColumnId int
+    );
 
-        DECLARE @IncludedFields TABLE (
-            FieldName nvarchar(40) NOT NULL,
-            ColumnId int
-        );
+    DECLARE @PossibleOrderFields TABLE (
+        FieldName nvarchar(40) NOT NULL
+    );
 
-        DECLARE @PossibleOrderFields TABLE (
-            FieldName nvarchar(40) NOT NULL
-        );
+    INSERT INTO @ExcludedFields 
+    SELECT 'RowIndex' UNION
+    SELECT 'OldId'
 
-        INSERT INTO @ExcludedFields 
-        SELECT 'RowIndex' UNION
-        SELECT 'OldId'
+    INSERT INTO @PossibleOrderFields
+	SELECT 'Title' UNION
+	SELECT 'Name' UNION
+	SELECT 'Number' UNION
+    SELECT 'SortOrder' 
+		
+    DECLARE
+        @objectId bigint,
+        @isView bit = 0,
+        @columnsCSL varchar(max),
+        @updateSetColumnsCSL varchar(max),
+        @paramsCSL varchar(max),
+        @paramsTypedCSL varchar(max),
+        @orderByClause varchar(100);
 
-        INSERT INTO @PossibleOrderFields
-        SELECT 'Number' UNION
-        SELECT 'SortOrder'
+    SELECT 
+        @objectId = object_id
+    FROM 
+        sys.tables
+    WHERE 
+        [Name] = @nameSingular;
 
-        DECLARE
-            @objectId bigint,
-            @isView bit = 0,
-            @columnsCSL varchar(max),
-            @updateSetColumnsCSL varchar(max),
-            @paramsCSL varchar(max),
-            @paramsTypedCSL varchar(max),
-            @orderByClause varchar(100);
-            --@procLoad varchar(max),
-            --@procSave varchar(max),
-            --@procDelete varchar(max),
-            --@procList varchar(max);
-
+    IF @objectId IS NULL 
+    BEGIN
+        SET @isView = 1;
         SELECT 
             @objectId = object_id
         FROM 
-            sys.tables
+            sys.views
         WHERE 
             [Name] = @nameSingular;
-
-        IF @objectId IS NULL 
-        BEGIN
-            SET @isView = 1;
-            SELECT 
-                @objectId = object_id
-            FROM 
-                sys.views
-            WHERE 
-                [Name] = @nameSingular;
-        END
+    END
 
 
 
-        INSERT INTO @IncludedFields (FieldName, ColumnId)
-        SELECT 
-            [name],
-            column_id
-        FROM 
-            sys.columns
-        WHERE
-            object_id = @objectId
-        AND
-            [Name] NOT IN (SELECT * FROM @ExcludedFields)
-        ORDER BY
-            column_id
+    INSERT INTO @IncludedFields (FieldName, ColumnId)
+    SELECT 
+        [name],
+        column_id
+    FROM 
+        sys.columns
+    WHERE
+        object_id = @objectId
+    AND
+        [Name] NOT IN (SELECT * FROM @ExcludedFields)
+    ORDER BY
+        column_id
 
     
-        SELECT
-            @columnsCSL = ISNULL(@columnsCSL, '') + '[' + [FieldName] + '], ',
-            @paramsCSL =  ISNULL(@paramsCSL, '') + '@' + [FieldName] + ', ',
-            @paramsTypedCSL = ISNULL(@paramsTypedCSL, '') + '@' + [FieldName] + ' ' + sys.types.name + Case When sys.types.name = 'nvarchar' Then '(' + Case When (sys.columns.max_length / 2) = 0 THEN 'max' Else Cast((sys.columns.max_length / 2) as varchar(10)) End + ')' Else '' End + ', ',
-            @updateSetColumnsCSL = ISNULL(@updateSetColumnsCSL, '') +
-                Case When [FieldName] = 'Identity' Then '' Else '[' + [FieldName] + ']'  + ' = @' + [FieldName] + ', ' End ,
-            @orderByClause = ISNULL(@orderByClause, '') +
-                Case When EXISTS (SELECT * FROM @PossibleOrderFields WHERE FieldName = sys.columns.name) Then '[' + [FieldName] + '], ' Else '' End
-        FROM
-            @IncludedFields F
-        INNER JOIN sys.columns ON
-            sys.columns.column_id = F.ColumnId 
-            AND sys.columns.name = F.FieldName
-            AND sys.columns.object_id = @objectId
-        INNER JOIN sys.types ON
-            sys.columns.user_type_id = sys.types.user_type_id
-            AND sys.types.name <> 'sysname'
+    SELECT
+        @columnsCSL = ISNULL(@columnsCSL, '') + '[' + [FieldName] + '], ',
+        @paramsCSL =  ISNULL(@paramsCSL, '') + '@' + [FieldName] + ', ',
+        @paramsTypedCSL = ISNULL(@paramsTypedCSL, '') + '@' + [FieldName] + ' ' + sys.types.name + Case When sys.types.name = 'nvarchar' Then '(' + Case When (sys.columns.max_length / 2) = 0 THEN 'max' Else Cast((sys.columns.max_length / 2) as varchar(10)) End + ')' Else '' End + ', ',
+        @updateSetColumnsCSL = ISNULL(@updateSetColumnsCSL, '') +
+            Case When [FieldName] = 'Identity' Then '' Else '[' + [FieldName] + ']'  + ' = @' + [FieldName] + ', ' End ,
+        @orderByClause = ISNULL(@orderByClause, '') +
+            Case When EXISTS (SELECT * FROM @PossibleOrderFields WHERE FieldName = sys.columns.name) Then '[' + [FieldName] + '], ' Else '' End
+    FROM
+        @IncludedFields F
+    INNER JOIN sys.columns ON
+        sys.columns.column_id = F.ColumnId 
+        AND sys.columns.name = F.FieldName
+        AND sys.columns.object_id = @objectId
+    INNER JOIN sys.types ON
+        sys.columns.user_type_id = sys.types.user_type_id
+        AND sys.types.name <> 'sysname'
 
 
-        SET @columnsCSL = SUBSTRING(RTRIM(@columnsCSL), 1, LEN(RTRIM(@columnsCSL)) - 1)
-        SET @paramsCSL = SUBSTRING(RTRIM(@paramsCSL), 1, LEN(RTRIM(@paramsCSL)) - 1)
-        SET @paramsTypedCSL = SUBSTRING(RTRIM(@paramsTypedCSL), 1, LEN(RTRIM(@paramsTypedCSL)) - 1)
+    SET @columnsCSL = SUBSTRING(RTRIM(@columnsCSL), 1, LEN(RTRIM(@columnsCSL)) - 1)
+    SET @paramsCSL = SUBSTRING(RTRIM(@paramsCSL), 1, LEN(RTRIM(@paramsCSL)) - 1)
+    SET @paramsTypedCSL = SUBSTRING(RTRIM(@paramsTypedCSL), 1, LEN(RTRIM(@paramsTypedCSL)) - 1)
 
-        IF CHARINDEX(',', @updateSetColumnsCSL) >= 1
-        BEGIN
-            SET @updateSetColumnsCSL = SUBSTRING(RTRIM(@updateSetColumnsCSL), 1, LEN(RTRIM(@updateSetColumnsCSL)) - 1);
-        END
+    IF CHARINDEX(',', @updateSetColumnsCSL) >= 1
+    BEGIN
+        SET @updateSetColumnsCSL = SUBSTRING(RTRIM(@updateSetColumnsCSL), 1, LEN(RTRIM(@updateSetColumnsCSL)) - 1);
+    END
 
-        IF CHARINDEX(',', @orderByClause) >= 1
-        BEGIN
-            SET @orderByClause = 'ORDER BY ' + SUBSTRING(RTRIM(@orderByClause), 1, LEN(RTRIM(@orderByClause)) - 1);
-        END
+    IF CHARINDEX(',', @orderByClause) >= 1
+    BEGIN
+        SET @orderByClause = 'ORDER BY ' + SUBSTRING(RTRIM(@orderByClause), 1, LEN(RTRIM(@orderByClause)) - 1);
+    END
 
-		SET @procFileNames = '';
+	SET @procFileNames = '';
 		
-        SELECT
-            @procList = 'CREATE PROCEDURE [' + @schemaName + '].[sp' + @namePlural + 'List]
+    SELECT
+        @procList = 'CREATE PROCEDURE [' + @schemaName + '].[sp' + @namePlural + 'List]
 AS
 BEGIN
     SELECT ' + @columnsCSL + ' FROM 

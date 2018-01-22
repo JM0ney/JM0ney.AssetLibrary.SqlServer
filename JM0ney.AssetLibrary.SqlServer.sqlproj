@@ -64,6 +64,7 @@
     <Folder Include="utility" />
     <Folder Include="utility\Schema" />
     <Folder Include="utility\Stored Procedures" />
+    <Folder Include="utility\Functions" />
   </ItemGroup>
   <ItemGroup>
     <Build Include="maintenance\Schema\maintenance.sql" />
@@ -74,5 +75,6 @@
     <Build Include="utility\Stored Procedures\spPrintSkeletonScriptCRUDProcedures.sql" />
     <Build Include="utility\Stored Procedures\spPrintSkeletonScriptMappingTableProcedures.sql" />
     <Build Include="utility\Stored Procedures\spPrintSkeletonScriptUpgradeScript.sql" />
+    <Build Include="utility\Functions\fnGenerateUrlSlug.sql" />
   </ItemGroup>
 </Project>
