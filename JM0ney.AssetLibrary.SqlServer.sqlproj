@@ -78,5 +78,6 @@
     <Build Include="utility\Stored Procedures\spPrintSkeletonScriptUpgradeScript.sql" />
     <Build Include="utility\Functions\fnGenerateUrlSlug.sql" />
     <Build Include="maintenance\Stored Procedures\spEnsureRolePermissions.sql" />
+    <Build Include="utility\Functions\fnToProperCase.sql" />
   </ItemGroup>
 </Project>
